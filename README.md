@@ -39,7 +39,7 @@ npm start
 ## API Documentation
 
 Swagger UI is available at:
-`http://localhost:3000/api-docs`
+`http://localhost:9001/api-docs`
 
 ### Example Endpoints
 

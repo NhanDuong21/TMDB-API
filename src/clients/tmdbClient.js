@@ -1,16 +1,22 @@
 const axios = require('axios');
+const http = require('http');
+const https = require('https');
 const config = require('../config/config');
+
+// Ép Node.js sử dụng IPv4 (khắc phục lỗi timeout thường gặp trên Node 17+ khi mạng có cấu hình IPv6 không ổn định)
+const httpAgent = new http.Agent({ family: 4 });
+const httpsAgent = new https.Agent({ family: 4 });
 
 const tmdbClient = axios.create({
   baseURL: config.tmdb.baseUrl,
   timeout: config.tmdb.timeout,
+  httpAgent,
+  httpsAgent,
   headers: {
     Accept: 'application/json',
     Authorization: `Bearer ${config.tmdb.token}`,
     'Accept-Encoding': 'gzip,deflate,compress'
-  },
-  // Ép Node.js sử dụng IPv4 (khắc phục lỗi timeout thường gặp trên Node 17+ khi mạng có cấu hình IPv6 không ổn định)
-  family: 4 
+  }
 });
 
 // Response interceptor for basic retry logic

@@ -37,7 +37,7 @@ const getMoviePreview = async (tmdbId, language = null) => {
     return cache.get(cacheKey);
   }
 
-  const appendList = 'credits,videos,images,keywords,recommendations,similar,release_dates,translations,external_ids,reviews,watch/providers,alternative_titles,collection';
+  const appendList = 'credits,videos,images,keywords,recommendations,similar,release_dates,translations,external_ids,reviews,watch/providers,alternative_titles,changes';
 
   const response = await tmdbClient.get(`/movie/${tmdbId}`, {
     params: {

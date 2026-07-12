@@ -26,11 +26,53 @@ const normalizeMovieData = (movie) => {
   const recommendations = movie.recommendations || {};
   const similar = movie.similar || {};
   const releaseDates = movie.release_dates || {};
-  const translations = movie.translations || {};
+  const translationsData = movie.translations || {};
   const externalIds = movie.external_ids || {};
   const reviews = movie.reviews || {};
   const watchProviders = movie['watch/providers'] || {};
   const alternativeTitles = movie.alternative_titles || {};
+  const changes = movie.changes || {};
+
+  // Map crew based on required jobs
+  const targetCrewJobs = [
+    'Director', 'Assistant Director', 'Producer', 'Executive Producer',
+    'Screenplay', 'Writer', 'Story', 'Original Story', 'Novel',
+    'Music', 'Original Music Composer', 'Director of Photography',
+    'Editor', 'Casting', 'Costume Design', 'Art Director',
+    'Production Design', 'Visual Effects', 'Animation', 'Sound'
+  ];
+
+  const filteredCrew = (credits.crew || []).filter(c => targetCrewJobs.includes(c.job));
+
+  // Helper for filtering specific roles
+  const getCrewByJobs = (jobs) => filteredCrew.filter(c => jobs.includes(c.job)).map(c => ({
+    tmdbPersonId: c.id,
+    name: c.name,
+    job: c.job,
+    profileImage: getImageUrl(c.profile_path)
+  }));
+
+  // Flatten release dates
+  const flatReleaseDates = [];
+  (releaseDates.results || []).forEach(country => {
+    (country.release_dates || []).forEach(rd => {
+      flatReleaseDates.push({
+        country: country.iso_3166_1,
+        certification: rd.certification,
+        releaseType: rd.type,
+        releaseDate: rd.release_date
+      });
+    });
+  });
+
+  // Sort translations: Vietnamese first, English second
+  const translations = (translationsData.translations || []).sort((a, b) => {
+    if (a.iso_639_1 === 'vi') return -1;
+    if (b.iso_639_1 === 'vi') return 1;
+    if (a.iso_639_1 === 'en') return -1;
+    if (b.iso_639_1 === 'en') return 1;
+    return 0;
+  });
 
   return {
     provider: 'TMDB',
@@ -56,7 +98,10 @@ const normalizeMovieData = (movie) => {
       poster: getImageUrl(movie.poster_path),
       backdrop: getImageUrl(movie.backdrop_path),
     },
-    genres: movie.genres || [],
+    genres: (movie.genres || []).map(g => ({
+      genreId: g.id,
+      genreName: g.name
+    })),
     casts: (credits.cast || []).map(c => ({
       tmdbPersonId: c.id,
       name: c.name,
@@ -68,7 +113,7 @@ const normalizeMovieData = (movie) => {
       castOrder: c.order,
       knownForDepartment: c.known_for_department
     })),
-    crew: (credits.crew || []).map(c => ({
+    crew: filteredCrew.map(c => ({
       tmdbPersonId: c.id,
       name: c.name,
       originalName: c.original_name,
@@ -78,23 +123,9 @@ const normalizeMovieData = (movie) => {
       popularity: c.popularity,
       profileImage: getImageUrl(c.profile_path)
     })),
-    directors: (credits.crew || []).filter(c => c.job === 'Director').map(c => ({
-      tmdbPersonId: c.id,
-      name: c.name,
-      profileImage: getImageUrl(c.profile_path)
-    })),
-    writers: (credits.crew || []).filter(c => ['Screenplay', 'Writer', 'Story', 'Original Story', 'Novel'].includes(c.job)).map(c => ({
-      tmdbPersonId: c.id,
-      name: c.name,
-      job: c.job,
-      profileImage: getImageUrl(c.profile_path)
-    })),
-    producers: (credits.crew || []).filter(c => ['Producer', 'Executive Producer'].includes(c.job)).map(c => ({
-      tmdbPersonId: c.id,
-      name: c.name,
-      job: c.job,
-      profileImage: getImageUrl(c.profile_path)
-    })),
+    directors: getCrewByJobs(['Director', 'Assistant Director']),
+    writers: getCrewByJobs(['Screenplay', 'Writer', 'Story', 'Original Story', 'Novel']),
+    producers: getCrewByJobs(['Producer', 'Executive Producer']),
     trailers: (videos.results || []).filter(v => v.site === 'YouTube' && ['Trailer', 'Teaser', 'Clip', 'Featurette', 'Behind the Scenes'].includes(v.type)),
     images: {
       backdrops: (images.backdrops || []).map(img => ({ ...img, file_path: getImageUrl(img.file_path) })),
@@ -117,7 +148,13 @@ const normalizeMovieData = (movie) => {
       englishName: lang.english_name,
       nativeName: lang.name
     })),
-    externalIds: externalIds,
+    externalIds: {
+      imdb: externalIds.imdb_id,
+      facebook: externalIds.facebook_id,
+      instagram: externalIds.instagram_id,
+      twitter: externalIds.twitter_id,
+      wikidata: externalIds.wikidata_id
+    },
     collection: movie.belongs_to_collection ? {
       collectionId: movie.belongs_to_collection.id,
       collectionName: movie.belongs_to_collection.name,
@@ -138,9 +175,10 @@ const normalizeMovieData = (movie) => {
     })),
     watchProviders: watchProviders.results || {},
     reviews: reviews.results || [],
-    translations: translations.translations || [],
-    releaseDates: releaseDates.results || [],
-    alternativeTitles: alternativeTitles.titles || []
+    translations: translations,
+    releaseDates: flatReleaseDates,
+    alternativeTitles: alternativeTitles.titles || [],
+    changeHistory: changes.changes || []
   };
 };
 

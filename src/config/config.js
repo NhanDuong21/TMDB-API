@@ -1,0 +1,22 @@
+const dotenv = require('dotenv');
+const path = require('path');
+
+// Load environment variables from .env file
+dotenv.config({ path: path.join(__dirname, '../../.env') });
+
+module.exports = {
+  env: process.env.NODE_ENV || 'development',
+  port: parseInt(process.env.PORT || '9001', 10),
+  tmdb: {
+    baseUrl: process.env.TMDB_BASE_URL || 'https://api.themoviedb.org/3',
+    imageBase: process.env.TMDB_IMAGE_BASE || 'https://image.tmdb.org/t/p',
+    imageSize: process.env.TMDB_IMAGE_SIZE || 'original',
+    defaultLanguage: process.env.TMDB_DEFAULT_LANGUAGE || 'vi-VN',
+    fallbackLanguage: process.env.TMDB_FALLBACK_LANGUAGE || 'en-US',
+    timeout: parseInt(process.env.TMDB_TIMEOUT || '10000', 10),
+    token: process.env.TMDB_TOKEN,
+  },
+  cache: {
+    ttl: parseInt(process.env.CACHE_TTL || '3600', 10)
+  }
+};

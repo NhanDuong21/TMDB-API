@@ -37,7 +37,7 @@ const getMoviePreview = async (tmdbId, language = null) => {
     return cache.get(cacheKey);
   }
 
-  const appendList = 'credits,videos,images,keywords,recommendations,similar,release_dates,translations,external_ids,reviews,watch/providers,alternative_titles,changes';
+  const appendList = 'credits,videos,images,keywords,similar,release_dates,translations,external_ids,reviews,watch/providers,alternative_titles,changes';
 
   const response = await tmdbClient.get(`/movie/${tmdbId}`, {
     params: {
@@ -108,10 +108,68 @@ const getMovieList = async (type, page = 1, language = null) => {
   return response.data;
 };
 
+const getMovieCredits = async (tmdbId, language = null) => {
+  const cacheKey = `credits_${tmdbId}_${language}`;
+  if (cache.has(cacheKey)) return cache.get(cacheKey);
+
+  const response = await tmdbClient.get(`/movie/${tmdbId}/credits`, {
+    params: { language: getLanguageParam(language) }
+  });
+
+  cache.set(cacheKey, response.data);
+  return response.data;
+};
+
+const getMovieVideos = async (tmdbId, language = null) => {
+  const cacheKey = `videos_${tmdbId}_${language}`;
+  if (cache.has(cacheKey)) return cache.get(cacheKey);
+
+  const response = await tmdbClient.get(`/movie/${tmdbId}/videos`, {
+    params: { language: getLanguageParam(language) }
+  });
+
+  cache.set(cacheKey, response.data);
+  return response.data;
+};
+
+const getMovieImages = async (tmdbId, language = null) => {
+  const cacheKey = `images_${tmdbId}`;
+  if (cache.has(cacheKey)) return cache.get(cacheKey);
+
+  // Images endpoint rarely uses language translation in the same way, but can be passed
+  const response = await tmdbClient.get(`/movie/${tmdbId}/images`, {
+    params: { language: getLanguageParam(language), include_image_language: 'en,null' }
+  });
+
+  cache.set(cacheKey, response.data);
+  return response.data;
+};
+
+const searchKeywords = async (query, page = 1) => {
+  const cacheKey = `search_keyword_${query}_${page}`;
+  if (cache.has(cacheKey)) {
+    return cache.get(cacheKey);
+  }
+
+  const response = await tmdbClient.get('/search/keyword', {
+    params: {
+      query,
+      page
+    }
+  });
+
+  cache.set(cacheKey, response.data);
+  return response.data;
+};
+
 module.exports = {
   searchMovies,
   getMoviePreview,
   getPersonDetail,
   getGenres,
-  getMovieList
+  getMovieList,
+  getMovieCredits,
+  getMovieVideos,
+  getMovieImages,
+  searchKeywords
 };

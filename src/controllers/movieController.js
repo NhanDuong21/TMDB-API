@@ -36,7 +36,7 @@ const search = async (req, res, next) => {
 
 const preview = async (req, res, next) => {
   try {
-    const { tmdbId } = req.params;
+    const { id: tmdbId } = req.params;
     const rawData = await tmdbService.getMoviePreview(tmdbId);
     const normalizedData = normalizeMovieData(rawData);
     
@@ -117,10 +117,82 @@ const movieList = async (req, res, next) => {
   }
 };
 
+const credits = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const rawData = await tmdbService.getMovieCredits(id);
+    const normalizedData = require('../utils/normalizeData').normalizeCredits(rawData);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Success',
+      data: normalizedData
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const videos = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const rawData = await tmdbService.getMovieVideos(id);
+    const normalizedData = require('../utils/normalizeData').normalizeVideos(rawData);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Success',
+      data: normalizedData
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const images = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const rawData = await tmdbService.getMovieImages(id);
+    const normalizedData = require('../utils/normalizeData').normalizeImages(rawData);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Success',
+      data: normalizedData
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const searchKeywords = async (req, res, next) => {
+  try {
+    const { keyword, page } = req.query;
+    const data = await tmdbService.searchKeywords(keyword, page);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Success',
+      data: {
+        page: data.page,
+        results: data.results, // Contains id and name of keywords
+        total_pages: data.total_pages,
+        total_results: data.total_results
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   search,
   preview,
   person,
   genres,
-  movieList
+  movieList,
+  credits,
+  videos,
+  images,
+  searchKeywords
 };

@@ -33,10 +33,14 @@ if (process.env.NODE_ENV !== 'test') {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Rate limiting
+// Rate limiting (Theo chuẩn TMDB: ~50 requests / 1 giây)
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  windowMs: 1000, // 1 giây
+  max: 50, // giới hạn mỗi IP tối đa 50 requests mỗi giây
+  message: {
+    success: false,
+    message: 'Too many requests, please try again later.'
+  }
 });
 app.use(limiter);
 
@@ -45,7 +49,9 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
 
 // Routes
 app.use('/health', healthRoutes);
-app.use('/api/import', importRoutes);
+
+const verifyApiKey = require('./middlewares/authMiddleware');
+app.use('/api/import', verifyApiKey, importRoutes);
 
 // Error Handling
 app.use(notFound);

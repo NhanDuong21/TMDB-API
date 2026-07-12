@@ -23,7 +23,7 @@ const normalizeMovieData = (movie) => {
   const videos = movie.videos || {};
   const images = movie.images || {};
   const keywords = movie.keywords || {};
-  const recommendations = movie.recommendations || {};
+
   const similar = movie.similar || {};
   const releaseDates = movie.release_dates || {};
   const translationsData = movie.translations || {};
@@ -161,12 +161,7 @@ const normalizeMovieData = (movie) => {
       poster: getImageUrl(movie.belongs_to_collection.poster_path),
       backdrop: getImageUrl(movie.belongs_to_collection.backdrop_path)
     } : null,
-    recommendations: (recommendations.results || []).map(r => ({
-      tmdbId: r.id,
-      title: r.title,
-      poster: getImageUrl(r.poster_path),
-      backdrop: getImageUrl(r.backdrop_path)
-    })),
+
     similarMovies: (similar.results || []).map(s => ({
       tmdbId: s.id,
       title: s.title,
@@ -182,7 +177,71 @@ const normalizeMovieData = (movie) => {
   };
 };
 
+const normalizeCredits = (credits) => {
+  if (!credits) return null;
+
+  const targetCrewJobs = [
+    'Director', 'Assistant Director', 'Producer', 'Executive Producer',
+    'Screenplay', 'Writer', 'Story', 'Original Story', 'Novel',
+    'Music', 'Original Music Composer', 'Director of Photography',
+    'Editor', 'Casting', 'Costume Design', 'Art Director',
+    'Production Design', 'Visual Effects', 'Animation', 'Sound'
+  ];
+
+  const filteredCrew = (credits.crew || []).filter(c => targetCrewJobs.includes(c.job));
+  const getCrewByJobs = (jobs) => filteredCrew.filter(c => jobs.includes(c.job)).map(c => ({
+    tmdbPersonId: c.id,
+    name: c.name,
+    job: c.job,
+    profileImage: getImageUrl(c.profile_path)
+  }));
+
+  return {
+    casts: (credits.cast || []).map(c => ({
+      tmdbPersonId: c.id,
+      name: c.name,
+      originalName: c.original_name,
+      character: c.character,
+      gender: c.gender,
+      popularity: c.popularity,
+      profileImage: getImageUrl(c.profile_path),
+      castOrder: c.order,
+      knownForDepartment: c.known_for_department
+    })),
+    crew: filteredCrew.map(c => ({
+      tmdbPersonId: c.id,
+      name: c.name,
+      originalName: c.original_name,
+      job: c.job,
+      department: c.department,
+      gender: c.gender,
+      popularity: c.popularity,
+      profileImage: getImageUrl(c.profile_path)
+    })),
+    directors: getCrewByJobs(['Director', 'Assistant Director']),
+    writers: getCrewByJobs(['Screenplay', 'Writer', 'Story', 'Original Story', 'Novel']),
+    producers: getCrewByJobs(['Producer', 'Executive Producer']),
+  };
+};
+
+const normalizeVideos = (videos) => {
+  if (!videos || !videos.results) return [];
+  return videos.results.filter(v => v.site === 'YouTube' && ['Trailer', 'Teaser', 'Clip', 'Featurette', 'Behind the Scenes'].includes(v.type));
+};
+
+const normalizeImages = (images) => {
+  if (!images) return null;
+  return {
+    backdrops: (images.backdrops || []).map(img => ({ ...img, file_path: getImageUrl(img.file_path) })),
+    posters: (images.posters || []).map(img => ({ ...img, file_path: getImageUrl(img.file_path) })),
+    logos: (images.logos || []).map(img => ({ ...img, file_path: getImageUrl(img.file_path) }))
+  };
+};
+
 module.exports = {
   getImageUrl,
   normalizeMovieData,
+  normalizeCredits,
+  normalizeVideos,
+  normalizeImages
 };

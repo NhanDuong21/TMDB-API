@@ -18,5 +18,8 @@ module.exports = {
   },
   cache: {
     ttl: parseInt(process.env.CACHE_TTL || '3600', 10)
+  },
+  security: {
+    apiKey: process.env.API_KEY || 'my-secret-key-123'
   }
 };

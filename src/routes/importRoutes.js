@@ -7,8 +7,16 @@ const { searchSchema, idSchema } = require('../validators/movieValidator');
 // Search movies
 router.get('/search', validate(searchSchema), movieController.search);
 
+// Search keywords (for autocomplete/suggestions)
+router.get('/search/keyword', validate(searchSchema), movieController.searchKeywords);
+
 // Get movie preview (aggregates multiple TMDB endpoints)
-router.get('/preview/:tmdbId', validate(idSchema, 'params'), movieController.preview);
+router.get('/preview/:id', validate(idSchema, 'params'), movieController.preview);
+
+// Standalone endpoints for movie details
+router.get('/movie/:id/credits', validate(idSchema, 'params'), movieController.credits);
+router.get('/movie/:id/videos', validate(idSchema, 'params'), movieController.videos);
+router.get('/movie/:id/images', validate(idSchema, 'params'), movieController.images);
 
 // Get person details
 router.get('/person/:id', validate(idSchema, 'params'), movieController.person);

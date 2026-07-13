@@ -1,5 +1,5 @@
-const tmdbClient = require('../clients/tmdbClient');
-const cache = require('../cache/nodeCache');
+const tmdbClient = require('../config/tmdbClient');
+const cache = require('../utils/nodeCache');
 
 const getLanguageParam = (language) => {
   return language ? language : require('../config/config').tmdb.defaultLanguage;

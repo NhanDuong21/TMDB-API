@@ -1,5 +1,30 @@
 const tmdbService = require('../services/tmdbService');
 const { normalizeMovieData } = require('../utils/normalizeData');
+const tmdbClient = require('../config/tmdbClient');
+const cache = require('../utils/nodeCache');
+
+const getHealthStatus = async (req, res, next) => {
+  try {
+    let tmdbStatus = 'DISCONNECTED';
+    
+    try {
+      await tmdbClient.get('/configuration');
+      tmdbStatus = 'CONNECTED';
+    } catch (error) {
+      console.error('TMDB connection error:', error.message);
+    }
+
+    const cacheStatus = cache ? 'OK' : 'ERROR';
+
+    res.status(200).json({
+      status: 'UP',
+      tmdb: tmdbStatus,
+      cache: cacheStatus
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 const search = async (req, res, next) => {
   try {
@@ -194,5 +219,6 @@ module.exports = {
   credits,
   videos,
   images,
-  searchKeywords
+  searchKeywords,
+  getHealthStatus
 };

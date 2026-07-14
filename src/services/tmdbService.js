@@ -202,6 +202,12 @@ const getRecommendations = async (tmdbId, language = null, page = 1) => {
 // =======================
 // DISCOVER / LIST ENDPOINTS
 // =======================
+const getLatestMovie = async () => {
+  // /movie/latest only returns one movie from TMDB
+  const response = await tmdbClient.get('/movie/latest');
+  return response.data;
+};
+
 const discoverMovies = async (params = {}) => {
   const cacheKey = `discover_movies_${JSON.stringify(params)}`;
   if (cache.has(cacheKey)) return cache.get(cacheKey);
@@ -308,6 +314,7 @@ module.exports = {
   getExternalIds,
   getSimilarMovies,
   getRecommendations,
+  getLatestMovie,
   discoverMovies,
   getMovieList,
   getPersonDetail,

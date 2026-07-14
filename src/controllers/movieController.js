@@ -3,6 +3,7 @@ const normalizeData = require('../utils/normalizeData');
 const tmdbClient = require('../config/tmdbClient');
 const cache = require('../utils/nodeCache');
 const config = require('../config/config');
+const latestCache = require('../services/tmdbLatestMovieCache.service');
 
 const buildResponse = (data, meta = null, pagination = null) => {
   const response = {
@@ -254,6 +255,27 @@ const recommendations = async (req, res, next) => {
 // =======================
 // DISCOVER / LIST ENDPOINTS
 // =======================
+const getLatestTop10 = async (req, res, next) => {
+  try {
+    let limit = 10;
+    if (req.query.limit) {
+      limit = parseInt(req.query.limit, 10);
+      if (isNaN(limit) || limit < 1) limit = 10;
+      if (limit > 10) limit = 10;
+    }
+    
+    const data = latestCache.getLatestMovies(limit);
+
+    res.status(200).json({
+      success: true,
+      message: 'Latest TMDB movies retrieved successfully',
+      data
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const discover = async (req, res, next) => {
   try {
     const params = {
@@ -439,6 +461,7 @@ module.exports = {
   externalIds,
   similar,
   recommendations,
+  getLatestTop10,
   discover,
   movieList,
   person,

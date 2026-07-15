@@ -255,20 +255,33 @@ const recommendations = async (req, res, next) => {
 // =======================
 // DISCOVER / LIST ENDPOINTS
 // =======================
-const getLatestTop10 = async (req, res, next) => {
+const getLatestTop20 = async (req, res, next) => {
+  try {
+    const data = await latestCache.getMergedLatestTop10();
+
+    res.status(200).json({
+      success: true,
+      data
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getVerifiedMovies = async (req, res, next) => {
   try {
     let limit = 10;
     if (req.query.limit) {
       limit = parseInt(req.query.limit, 10);
       if (isNaN(limit) || limit < 1) limit = 10;
-      if (limit > 10) limit = 10;
+      if (limit > 20) limit = 20; // Requirement: Maximum 20
     }
     
     const data = latestCache.getLatestMovies(limit);
 
+    // Follow existing project response format
     res.status(200).json({
       success: true,
-      message: 'Latest TMDB movies retrieved successfully',
       data
     });
   } catch (error) {
@@ -461,7 +474,8 @@ module.exports = {
   externalIds,
   similar,
   recommendations,
-  getLatestTop10,
+  getLatestTop20,
+  getVerifiedMovies,
   discover,
   movieList,
   person,

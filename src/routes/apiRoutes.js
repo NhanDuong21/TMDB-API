@@ -33,7 +33,8 @@ router.get('/api/person/:id', validate(schemas.idSchema, 'params'), movieControl
 router.get('/api/genres', movieController.genres);
 
 // Movie Lists
-router.get('/api/tmdb/movies/latest-top10', movieController.getLatestTop10);
+router.get('/api/tmdb/movies/latest-top20', movieController.getLatestTop20);
+router.get('/api/tmdb/verified-movies', movieController.getVerifiedMovies); // NEW Verified Movie API
 router.get('/api/popular', validate(schemas.listSchema), movieController.movieList);
 router.get('/api/upcoming', validate(schemas.listSchema), movieController.movieList);
 router.get('/api/now-playing', validate(schemas.listSchema), movieController.movieList);

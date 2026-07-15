@@ -60,8 +60,17 @@ x-api-key: your-internal-api-key
 - **Cache Dữ Liệu:** Dịch vụ sử dụng bộ nhớ cache tạm thời trên RAM (`node-cache`) để tăng tốc độ phản hồi.
 - **Tự Động Xử Lý Ngôn Ngữ:** Dịch vụ ưu tiên trả về dữ liệu phim bằng tiếng Việt (`vi-VN`). Nếu thiếu, hệ thống tự động điền phần thiếu bằng thông tin tiếng Anh (`en-US`).
 
-## 6. Mã Lỗi (Error Codes)
-Dưới đây là các mã lỗi chuẩn mà API có thể trả về:
+## 6. Cấu Trúc Phản Hồi Chung (Standard Response)
+Hầu hết các API trả về cấu trúc chuẩn như sau:
+```json
+{
+  "success": true,
+  "data": { /* Dữ liệu trả về tùy API */ },
+  "meta": { "timestamp": "2026-07-15T00:00:00.000Z" }
+}
+```
+
+Dưới đây là các mã lỗi (Error Codes) chuẩn mà API có thể trả về:
 - `VALIDATION_ERROR`
 - `INVALID_API_KEY`
 - `TMDB_MOVIE_NOT_FOUND`
@@ -76,46 +85,59 @@ Dưới đây là các mã lỗi chuẩn mà API có thể trả về:
 
 ---
 
-## 7. Danh Sách Các API Endpoints (Chi Tiết)
+## 7. Danh Sách Các API Endpoints (Chi Tiết & Kết Quả Trả Về)
 
-Dưới đây là danh sách tổng hợp toàn bộ các API Endpoints hiện có trong hệ thống (để xem schema JSON chi tiết của từng endpoint, vui lòng tham khảo Swagger tại `/api-docs`):
+Dưới đây là danh sách tổng hợp toàn bộ các API Endpoints hiện có. *Lưu ý: Dữ liệu thực tế thường nằm trong trường `data` của cấu trúc phản hồi chuẩn nêu ở trên.*
 
 ### Health
 - **`GET /health`**
   - **Chức năng:** Kiểm tra trạng thái hoạt động của API.
   - **Yêu cầu API Key:** Không.
+  - **Trả về:** Cấu trúc trực tiếp `{ status: "UP", tmdb: "CONNECTED", cache: "OK" }`
 
 ### Search
 - **`GET /api/import/search`**
   - **Chức năng:** Tìm kiếm phim theo từ khóa.
   - **Tham số Query:** `keyword` (bắt buộc), `page` (mặc định: 1), `language`, `region`, `includeAdult` (mặc định: false).
+  - **Trả về (`data`):** Mảng danh sách các phim (`MovieListItem`) kèm đối tượng phân trang (`Pagination`).
 - **`GET /api/import/search/suggestions`**
   - **Chức năng:** Gợi ý tìm kiếm phim (thích hợp cho tính năng Autocomplete).
   - **Tham số Query:** `keyword` (bắt buộc), `page` (mặc định: 1).
+  - **Trả về (`data`):** Mảng danh sách các phim rút gọn (`MovieListItem`).
 
 ### Movie Import
 - **`GET /api/import/movies/{tmdbId}/bundle`**
   - **Chức năng:** Tải về toàn bộ dữ liệu gói (bundle) của một bộ phim phục vụ cho quá trình Import vào hệ thống nội bộ.
   - **Tham số Path:** `tmdbId` (bắt buộc).
   - **Tham số Query:** `language`.
+  - **Trả về (`data`):** Đối tượng `MovieImportBundle` bao gồm mọi thứ (chi tiết phim `movie`, thể loại `genres`, đoàn phim `credits`, hình ảnh `media`, video trailers `videos`, thông tin phát hành `releaseInfo`, bản dịch `translations`, externalIds...).
 
 ### Reference Data
 - **`GET /api/import/genres`**
   - **Chức năng:** Lấy danh sách thể loại phim để tham chiếu.
   - **Tham số Query:** `language`.
+  - **Trả về (`data`):** Mảng danh sách các thể loại phim.
 
 ### Movie Resources
 Tất cả đều yêu cầu tham số Path `tmdbId`:
-- **`GET /api/import/movies/{tmdbId}/release-dates`**: Lấy thông tin ngày phát hành của phim.
-- **`GET /api/import/movies/{tmdbId}/translations`**: Lấy các bản dịch ngôn ngữ của phim.
-- **`GET /api/import/movies/{tmdbId}/external-ids`**: Lấy các ID liên kết bên ngoài (như IMDB, Facebook, v.v.).
+- **`GET /api/import/movies/{tmdbId}/release-dates`**
+  - **Chức năng:** Lấy thông tin ngày phát hành của phim.
+  - **Trả về (`data`):** Đối tượng `ReleaseInformation` chứa thông tin lịch chiếu các quốc gia.
+- **`GET /api/import/movies/{tmdbId}/translations`**
+  - **Chức năng:** Lấy các bản dịch ngôn ngữ của phim.
+  - **Trả về (`data`):** Mảng danh sách đối tượng `Translation`.
+- **`GET /api/import/movies/{tmdbId}/external-ids`**
+  - **Chức năng:** Lấy các ID liên kết bên ngoài (như IMDB, Facebook, v.v.).
+  - **Trả về (`data`):** Đối tượng `ExternalIds` (gồm `imdbId`, `tmdbId`, v.v.).
 
 ### Movie Discovery
 - **`GET /api/import/discover/movies`**
   - **Chức năng:** Khám phá phim dựa trên các tiêu chí lọc.
   - **Tham số Query:** `page` (mặc định: 1), `sortBy` (mặc định: `popularity.desc`).
+  - **Trả về (`data`):** Mảng danh sách các phim (`MovieListItem`) kèm thông tin phân trang (`Pagination`).
 
 ### Movie Lists
-- **`GET /api/tmdb/movies/latest-top10`**
-  - **Chức năng:** Lấy danh sách 10 phim mới nhất (dữ liệu được cache bởi một tiến trình (job) chạy ngầm để tăng tốc độ phản hồi).
+- **`GET /api/tmdb/movies/latest-top20`**
+  - **Mô tả:** Trả về danh sách 20 bộ phim mới nhất đã qua kiểm định (Verified). Nếu chưa đủ 20 phim, hệ thống sẽ tự động dùng phim sắp chiếu (Future) để đắp vào cho đủ 20. Phim nào mới duyệt xong sẽ tự động lên đầu bảng xếp hạng.
   - **Tham số Query:** `limit` (tối đa 10).
+  - **Trả về (`data`):** Mảng chứa 10 bộ phim mới nhất.

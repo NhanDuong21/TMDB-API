@@ -73,3 +73,49 @@ Dưới đây là các mã lỗi chuẩn mà API có thể trả về:
 - `TMDB_TIMEOUT`
 - `TMDB_BAD_RESPONSE`
 - `INTERNAL_SERVER_ERROR`
+
+---
+
+## 7. Danh Sách Các API Endpoints (Chi Tiết)
+
+Dưới đây là danh sách tổng hợp toàn bộ các API Endpoints hiện có trong hệ thống (để xem schema JSON chi tiết của từng endpoint, vui lòng tham khảo Swagger tại `/api-docs`):
+
+### Health
+- **`GET /health`**
+  - **Chức năng:** Kiểm tra trạng thái hoạt động của API.
+  - **Yêu cầu API Key:** Không.
+
+### Search
+- **`GET /api/import/search`**
+  - **Chức năng:** Tìm kiếm phim theo từ khóa.
+  - **Tham số Query:** `keyword` (bắt buộc), `page` (mặc định: 1), `language`, `region`, `includeAdult` (mặc định: false).
+- **`GET /api/import/search/suggestions`**
+  - **Chức năng:** Gợi ý tìm kiếm phim (thích hợp cho tính năng Autocomplete).
+  - **Tham số Query:** `keyword` (bắt buộc), `page` (mặc định: 1).
+
+### Movie Import
+- **`GET /api/import/movies/{tmdbId}/bundle`**
+  - **Chức năng:** Tải về toàn bộ dữ liệu gói (bundle) của một bộ phim phục vụ cho quá trình Import vào hệ thống nội bộ.
+  - **Tham số Path:** `tmdbId` (bắt buộc).
+  - **Tham số Query:** `language`.
+
+### Reference Data
+- **`GET /api/import/genres`**
+  - **Chức năng:** Lấy danh sách thể loại phim để tham chiếu.
+  - **Tham số Query:** `language`.
+
+### Movie Resources
+Tất cả đều yêu cầu tham số Path `tmdbId`:
+- **`GET /api/import/movies/{tmdbId}/release-dates`**: Lấy thông tin ngày phát hành của phim.
+- **`GET /api/import/movies/{tmdbId}/translations`**: Lấy các bản dịch ngôn ngữ của phim.
+- **`GET /api/import/movies/{tmdbId}/external-ids`**: Lấy các ID liên kết bên ngoài (như IMDB, Facebook, v.v.).
+
+### Movie Discovery
+- **`GET /api/import/discover/movies`**
+  - **Chức năng:** Khám phá phim dựa trên các tiêu chí lọc.
+  - **Tham số Query:** `page` (mặc định: 1), `sortBy` (mặc định: `popularity.desc`).
+
+### Movie Lists
+- **`GET /api/tmdb/movies/latest-top10`**
+  - **Chức năng:** Lấy danh sách 10 phim mới nhất (dữ liệu được cache bởi một tiến trình (job) chạy ngầm để tăng tốc độ phản hồi).
+  - **Tham số Query:** `limit` (tối đa 10).

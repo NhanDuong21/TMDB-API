@@ -46,6 +46,16 @@ class MovieQualityCheckerService {
     // Invalid TMDB data
     if (!movie.id) return false;
 
+    // Reject movies that are older than today
+    if (movie.release_date) {
+      const releaseDate = new Date(movie.release_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (releaseDate < today) {
+        return false;
+      }
+    }
+
     // Spam keywords
     const titleToCheck = (movie.title || movie.original_title).toLowerCase();
     for (const keyword of this.SPAM_KEYWORDS) {

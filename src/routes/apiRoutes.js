@@ -3,6 +3,7 @@ const router = express.Router();
 const movieController = require('../controllers/movieController');
 const { validate, schemas } = require('../middlewares/requestValidator');
 const verifyApiKey = require('../middlewares/authMiddleware');
+const tmdbSyncRoutes = require('./tmdbSyncRoutes');
 
 // =======================
 // HEALTH CHECK
@@ -12,6 +13,12 @@ router.get('/health', movieController.getHealthStatus);
 // =======================
 // PUBLIC ENDPOINTS (Legacy/Current aliases)
 // =======================
+
+// =======================
+// TMDB SYNC API (NEW)
+// =======================
+router.use('/api/tmdb', tmdbSyncRoutes);
+
 // Search movies
 router.get('/api/search', validate(schemas.searchSchema), movieController.search);
 

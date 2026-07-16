@@ -217,3 +217,78 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponse'
+  /api/tmdb/export:
+    get:
+      summary: Stream Daily TMDB Export
+      tags: [TMDB Sync]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: query
+          name: cursor
+          schema:
+            type: integer
+            default: 0
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /api/tmdb/movies/latest:
+    get:
+      summary: Get Latest Valid Movie
+      tags: [TMDB Sync]
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /api/tmdb/movies/updated:
+    get:
+      summary: Get Recently Updated Movies
+      tags: [TMDB Sync]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+  /api/tmdb/movies/{tmdbId}:
+    get:
+      summary: Sync Specific Movie by ID
+      tags: [TMDB Sync]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: path
+          name: tmdbId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'

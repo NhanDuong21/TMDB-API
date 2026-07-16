@@ -2,14 +2,18 @@ const zlib = require('zlib');
 const readline = require('readline');
 const http = require('http');
 const https = require('https');
+const fs = require('fs');
+const path = require('path');
 const config = require('../config/config');
+
+const DATA_DIR = path.join(__dirname, '../../data');
+const LOCAL_EXPORT_FILE = path.join(DATA_DIR, 'movie_ids.json.gz');
 
 class TmdbExportStreamService {
   
   /**
    * Generates the export file date string (MM_DD_YYYY).
    * TMDB daily exports usually generated around 8 AM UTC.
-   * If not available, we can fallback to yesterday.
    */
   getExportDateString(date = new Date()) {
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -19,88 +23,122 @@ class TmdbExportStreamService {
   }
 
   /**
-   * Fetches the exported movie IDs. Streams and parses the gzip,
-   * skipping the first `cursor` records, returning `limit` records.
-   * It immediately aborts the HTTP request once the limit is reached to save memory/bandwidth.
+   * Downloads the TMDB export file and saves it locally.
    */
-  async getMovieIds(cursor = 0, limit = 20) {
+  async downloadExportFile() {
     let date = new Date();
     try {
-      return await this._streamExport(date, cursor, limit);
+      await this._downloadFile(date);
     } catch (error) {
       if (error.status === 404) {
         // Fallback to yesterday if today's export is not ready
         console.warn(`Export for today (${this.getExportDateString(date)}) not found. Falling back to yesterday.`);
         date.setDate(date.getDate() - 1);
-        return await this._streamExport(date, cursor, limit);
+        await this._downloadFile(date);
+      } else {
+        throw error;
       }
-      throw error;
     }
   }
 
-  _streamExport(date, cursor, limit) {
+  _downloadFile(date) {
     return new Promise((resolve, reject) => {
       const dateString = this.getExportDateString(date);
       const url = `${config.tmdb.exportBaseUrl}/movie_ids_${dateString}.json.gz`;
       
       const protocol = url.startsWith('https') ? https : http;
       
-      const req = protocol.get(url, (res) => {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+
+      const fileStream = fs.createWriteStream(LOCAL_EXPORT_FILE);
+
+      protocol.get(url, (res) => {
         if (res.statusCode === 404) {
-          req.destroy();
+          fileStream.close();
           return reject({ status: 404, message: 'Export not found' });
         }
         if (res.statusCode !== 200) {
-          req.destroy();
+          fileStream.close();
           return reject(new Error(`Failed to fetch TMDB export: ${res.statusCode}`));
         }
 
-        const gunzip = zlib.createGunzip();
-        res.pipe(gunzip);
+        res.pipe(fileStream);
 
-        const rl = readline.createInterface({
-          input: gunzip,
-          crlfDelay: Infinity
+        fileStream.on('finish', () => {
+          fileStream.close();
+          resolve();
         });
 
-        let currentLine = 0;
-        const results = [];
-        let hasMore = true;
-
-        rl.on('line', (line) => {
-          if (currentLine >= cursor && currentLine < cursor + limit) {
-            try {
-              const parsed = JSON.parse(line);
-              results.push(parsed.id);
-            } catch (e) {
-              console.warn('Failed to parse line:', line);
-            }
-          }
-          currentLine++;
-
-          if (currentLine >= cursor + limit) {
-            // We got all we need, abort to save bandwidth
-            hasMore = true;
-            rl.close();
-            req.destroy(); // Destroy the connection
-            resolve({ ids: results, hasMore, totalRead: currentLine });
-          }
+        fileStream.on('error', (err) => {
+          fs.unlink(LOCAL_EXPORT_FILE, () => reject(err));
         });
+      }).on('error', (err) => {
+        fs.unlink(LOCAL_EXPORT_FILE, () => reject(err));
+      });
+    });
+  }
 
-        rl.on('close', () => {
-          // If we reach here without aborting, we hit the end of the file
-          if (!req.destroyed) {
-            hasMore = false;
-            resolve({ ids: results, hasMore, totalRead: currentLine });
-          }
-        });
+  /**
+   * Reads from the locally downloaded file.
+   */
+  async getMovieIds(cursor = 0, limit = 20) {
+    if (!fs.existsSync(LOCAL_EXPORT_FILE)) {
+      throw new Error("Local export file not found. Please call /api/tmdb/download-export first.");
+    }
+    return await this._streamExportLocal(cursor, limit);
+  }
 
-        rl.on('error', (err) => {
-          reject(err);
-        });
+  _streamExportLocal(cursor, limit) {
+    return new Promise((resolve, reject) => {
+      const fileStream = fs.createReadStream(LOCAL_EXPORT_FILE);
+      const gunzip = zlib.createGunzip();
+      
+      fileStream.pipe(gunzip);
+
+      const rl = readline.createInterface({
+        input: gunzip,
+        crlfDelay: Infinity
       });
 
-      req.on('error', (err) => {
+      let currentLine = 0;
+      const results = [];
+      let hasMore = true;
+
+      rl.on('line', (line) => {
+        if (currentLine >= cursor && currentLine < cursor + limit) {
+          try {
+            const parsed = JSON.parse(line);
+            results.push(parsed.id);
+          } catch (e) {
+            console.warn('Failed to parse line:', line);
+          }
+        }
+        currentLine++;
+
+        if (currentLine >= cursor + limit) {
+          // We got all we need, abort to save CPU
+          hasMore = true;
+          rl.close();
+          fileStream.destroy(); // Stop reading the file early
+          resolve({ ids: results, hasMore, totalRead: currentLine });
+        }
+      });
+
+      rl.on('close', () => {
+        // If we reach here without aborting, we hit the end of the file
+        if (!fileStream.destroyed) {
+          hasMore = false;
+          resolve({ ids: results, hasMore, totalRead: currentLine });
+        }
+      });
+
+      rl.on('error', (err) => {
+        reject(err);
+      });
+      
+      fileStream.on('error', (err) => {
         reject(err);
       });
     });

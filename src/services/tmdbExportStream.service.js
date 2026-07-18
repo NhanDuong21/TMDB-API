@@ -95,6 +95,14 @@ class TmdbExportStreamService {
       const fileStream = fs.createReadStream(LOCAL_EXPORT_FILE);
       const gunzip = zlib.createGunzip();
       
+      // Prevent Z_BUF_ERROR when we intentionally destroy the stream early
+      gunzip.on('error', (err) => {
+        if (fileStream.destroyed && err.code === 'Z_BUF_ERROR') {
+          return; // Ignore
+        }
+        reject(err);
+      });
+
       fileStream.pipe(gunzip);
 
       const rl = readline.createInterface({

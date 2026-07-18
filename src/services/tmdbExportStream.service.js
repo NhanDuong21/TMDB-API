@@ -4,6 +4,7 @@ const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const { pipeline } = require('stream');
 const config = require('../config/config');
 
 const DATA_DIR = path.join(__dirname, '../../data');
@@ -52,28 +53,27 @@ class TmdbExportStreamService {
         fs.mkdirSync(DATA_DIR, { recursive: true });
       }
 
-      const fileStream = fs.createWriteStream(LOCAL_EXPORT_FILE);
-
       protocol.get(url, (res) => {
         if (res.statusCode === 404) {
-          fileStream.close();
           return reject({ status: 404, message: 'Export not found' });
         }
         if (res.statusCode !== 200) {
-          fileStream.close();
           return reject(new Error(`Failed to fetch TMDB export: ${res.statusCode}`));
         }
 
-        res.pipe(fileStream);
+        const fileStream = fs.createWriteStream(LOCAL_EXPORT_FILE);
 
-        fileStream.on('finish', () => {
-          fileStream.close();
-          resolve();
-        });
-
-        fileStream.on('error', (err) => {
-          fs.unlink(LOCAL_EXPORT_FILE, () => reject(err));
-        });
+        pipeline(
+          res,
+          fileStream,
+          (err) => {
+            if (err) {
+              fs.unlink(LOCAL_EXPORT_FILE, () => reject(err));
+            } else {
+              resolve();
+            }
+          }
+        );
       }).on('error', (err) => {
         fs.unlink(LOCAL_EXPORT_FILE, () => reject(err));
       });

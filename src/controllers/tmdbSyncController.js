@@ -2,6 +2,18 @@ const tmdbExportStream = require('../services/tmdbExportStream.service');
 const movieSyncService = require('../services/movieSync.service');
 const tmdbClient = require('../config/tmdbClient');
 
+const downloadExportFile = async (req, res, next) => {
+  try {
+    await tmdbExportStream.downloadExportFile();
+    res.status(200).json({
+      success: true,
+      message: 'Export file downloaded and ready for streaming'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const exportMovies = async (req, res, next) => {
   try {
     const cursor = parseInt(req.query.cursor || '0', 10);
@@ -18,6 +30,12 @@ const exportMovies = async (req, res, next) => {
       movies: processedMovies
     });
   } catch (error) {
+    if (error.message.includes('Local export file not found')) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
     next(error);
   }
 };
@@ -92,6 +110,7 @@ const movieDetail = async (req, res, next) => {
 };
 
 module.exports = {
+  downloadExportFile,
   exportMovies,
   latestMovies,
   updatedMovies,

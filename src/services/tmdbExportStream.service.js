@@ -54,8 +54,9 @@ class TmdbExportStreamService {
       }
 
       protocol.get(url, (res) => {
-        if (res.statusCode === 404) {
-          return reject({ status: 404, message: 'Export not found' });
+        // TMDB uses AWS S3 which returns 403 Forbidden instead of 404 when a file doesn't exist
+        if (res.statusCode === 404 || res.statusCode === 403) {
+          return reject({ status: 404, message: 'Export not found or not yet generated for today' });
         }
         if (res.statusCode !== 200) {
           return reject(new Error(`Failed to fetch TMDB export: ${res.statusCode}`));

@@ -9,6 +9,7 @@ const config = require('../config/config');
 
 const DATA_DIR = path.join(__dirname, '../../data');
 const LOCAL_EXPORT_FILE = path.join(DATA_DIR, 'movie_ids.json.gz');
+const SORTED_EXPORT_FILE = path.join(DATA_DIR, 'movie_ids_sorted.json.gz');
 
 class TmdbExportStreamService {
   
@@ -30,16 +31,16 @@ class TmdbExportStreamService {
   async downloadExportFile(maxRetries = 3) {
     let date = new Date();
     
-    // Check if the file exists and was downloaded today
-    if (fs.existsSync(LOCAL_EXPORT_FILE)) {
-      const stats = fs.statSync(LOCAL_EXPORT_FILE);
+    // Check if the sorted export file exists and was downloaded today
+    if (fs.existsSync(SORTED_EXPORT_FILE)) {
+      const stats = fs.statSync(SORTED_EXPORT_FILE);
       const mtime = stats.mtime;
       if (
         mtime.getDate() === date.getDate() &&
         mtime.getMonth() === date.getMonth() &&
         mtime.getFullYear() === date.getFullYear()
       ) {
-        console.log(`[TMDB Export Stream] Export file already downloaded today (${mtime.toISOString().split('T')[0]}). Skipping download.`);
+        console.log(`[TMDB Export Stream] Export file already downloaded and sorted today (${mtime.toISOString().split('T')[0]}). Skipping download.`);
         return;
       }
     }
@@ -52,6 +53,7 @@ class TmdbExportStreamService {
       try {
         await this._downloadFile(date);
         console.log(`[TMDB Export Stream] Export file successfully downloaded to ${LOCAL_EXPORT_FILE}`);
+        await this.sortExportFile();
         return; // Success, exit the loop
       } catch (error) {
         // If it's a 404/403, we fallback to yesterday's date ONCE
@@ -61,6 +63,7 @@ class TmdbExportStreamService {
           try {
             await this._downloadFile(date);
             console.log(`[TMDB Export Stream] Yesterday's export file successfully downloaded to ${LOCAL_EXPORT_FILE}`);
+            await this.sortExportFile();
             return; // Success on yesterday's file
           } catch (fallbackError) {
             error = fallbackError; // If fallback also fails (e.g. network drops), we let the retry catch it
@@ -119,20 +122,108 @@ class TmdbExportStreamService {
   }
 
   /**
-   * Reads from the locally downloaded file.
+   * Sorts the raw downloaded export file by TMDB ID DESCENDING (newest/highest IDs first).
+   * Optimized for low-spec VPS (2GB RAM, 2 CPUs, 10GB SSD):
+   * - Uses fast string index parsing (avoiding millions of JSON.parse objects in RAM)
+   * - Stream chunks output to gzip with optimal compression level
+   * - Deletes raw file after sorting to save ~27MB disk space
+   */
+  async sortExportFile() {
+    if (!fs.existsSync(LOCAL_EXPORT_FILE)) {
+      throw new Error('Raw export file not found to sort');
+    }
+    console.log('[TMDB Export Stream] Sorting TMDB export file by ID DESCENDING (newest first)...');
+    const startTime = Date.now();
+
+    return new Promise((resolve, reject) => {
+      const fileStream = fs.createReadStream(LOCAL_EXPORT_FILE);
+      const gunzip = zlib.createGunzip();
+      const rl = readline.createInterface({ input: gunzip, crlfDelay: Infinity });
+
+      const items = [];
+      fileStream.pipe(gunzip);
+
+      rl.on('line', (line) => {
+        if (!line) return;
+        const idx = line.indexOf('"id":');
+        if (idx !== -1) {
+          const end = line.indexOf(',', idx);
+          const id = parseInt(line.substring(idx + 5, end), 10);
+          if (!isNaN(id)) {
+            items.push({ id, line });
+          }
+        }
+      });
+
+      rl.on('close', () => {
+        // Sort DESCENDING: highest TMDB ID first (b.id - a.id)
+        items.sort((a, b) => b.id - a.id);
+
+        const tempSortedFile = SORTED_EXPORT_FILE + '.tmp';
+        const outStream = fs.createWriteStream(tempSortedFile);
+        const gzip = zlib.createGzip({ level: 6 });
+        gzip.pipe(outStream);
+
+        const CHUNK_SIZE = 10000;
+        for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+          const chunk = items.slice(i, i + CHUNK_SIZE).map(item => item.line).join('\n') + '\n';
+          gzip.write(chunk);
+        }
+        gzip.end();
+
+        outStream.on('finish', () => {
+          if (fs.existsSync(SORTED_EXPORT_FILE)) {
+            try { fs.unlinkSync(SORTED_EXPORT_FILE); } catch (e) {}
+          }
+          fs.renameSync(tempSortedFile, SORTED_EXPORT_FILE);
+          
+          // Delete raw export file to save disk space on VPS (10GB SSD limit)
+          if (fs.existsSync(LOCAL_EXPORT_FILE)) {
+            try {
+              fs.unlinkSync(LOCAL_EXPORT_FILE);
+              console.log('[TMDB Export Stream] Deleted raw export file to save ~27MB disk space');
+            } catch (e) {}
+          }
+
+          const elapsed = Date.now() - startTime;
+          console.log(`[TMDB Export Stream] Successfully sorted ${items.length} items by ID DESCENDING in ${elapsed}ms`);
+          
+          // Help V8 GC reclaim RAM immediately
+          items.length = 0;
+          resolve();
+        });
+
+        outStream.on('error', reject);
+        gzip.on('error', reject);
+      });
+
+      rl.on('error', reject);
+      gunzip.on('error', reject);
+      fileStream.on('error', reject);
+    });
+  }
+
+  /**
+   * Reads from the locally downloaded and sorted file.
    */
   async getMovieIds(cursor = 0, limit = 20) {
-    if (!fs.existsSync(LOCAL_EXPORT_FILE)) {
-      console.log('[TMDB Export Stream] Local export file not found. Automatically downloading before streaming...');
-      await this.downloadExportFile();
+    if (!fs.existsSync(SORTED_EXPORT_FILE)) {
+      if (fs.existsSync(LOCAL_EXPORT_FILE)) {
+        console.log('[TMDB Export Stream] Sorted export file not found. Sorting existing raw export file...');
+        await this.sortExportFile();
+      } else {
+        console.log('[TMDB Export Stream] Local export file not found. Automatically downloading and sorting before streaming...');
+        await this.downloadExportFile();
+      }
     }
-    console.log(`[TMDB Export Stream] Reading local export file from cursor: ${cursor}, limit: ${limit}`);
+    console.log(`[TMDB Export Stream] Reading sorted export file (DESCENDING) from cursor: ${cursor}, limit: ${limit}`);
     return await this._streamExportLocal(cursor, limit);
   }
 
   _streamExportLocal(cursor, limit) {
     return new Promise((resolve, reject) => {
-      const fileStream = fs.createReadStream(LOCAL_EXPORT_FILE);
+      const targetFile = fs.existsSync(SORTED_EXPORT_FILE) ? SORTED_EXPORT_FILE : LOCAL_EXPORT_FILE;
+      const fileStream = fs.createReadStream(targetFile);
       const gunzip = zlib.createGunzip();
       
       // Prevent Z_BUF_ERROR when we intentionally destroy the stream early

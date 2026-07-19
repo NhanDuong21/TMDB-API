@@ -25,19 +25,55 @@ class TmdbExportStreamService {
 
   /**
    * Downloads the TMDB export file and saves it locally.
+   * Includes an auto-retry mechanism for network failures.
    */
-  async downloadExportFile() {
+  async downloadExportFile(maxRetries = 3) {
     let date = new Date();
-    try {
-      await this._downloadFile(date);
-    } catch (error) {
-      if (error.status === 404) {
-        // Fallback to yesterday if today's export is not ready
-        console.warn(`Export for today (${this.getExportDateString(date)}) not found. Falling back to yesterday.`);
-        date.setDate(date.getDate() - 1);
+    
+    // Check if the file exists and was downloaded today
+    if (fs.existsSync(LOCAL_EXPORT_FILE)) {
+      const stats = fs.statSync(LOCAL_EXPORT_FILE);
+      const mtime = stats.mtime;
+      if (
+        mtime.getDate() === date.getDate() &&
+        mtime.getMonth() === date.getMonth() &&
+        mtime.getFullYear() === date.getFullYear()
+      ) {
+        console.log(`[TMDB Export Stream] Export file already downloaded today (${mtime.toISOString().split('T')[0]}). Skipping download.`);
+        return;
+      }
+    }
+
+    let attempt = 0;
+    
+    const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    while (attempt <= maxRetries) {
+      try {
         await this._downloadFile(date);
-      } else {
-        throw error;
+        console.log(`[TMDB Export Stream] Export file successfully downloaded to ${LOCAL_EXPORT_FILE}`);
+        return; // Success, exit the loop
+      } catch (error) {
+        // If it's a 404/403, we fallback to yesterday's date ONCE
+        if (error.status === 404 || error.status === 403) {
+          console.warn(`[TMDB Export Stream] Export for today (${this.getExportDateString(date)}) not found. Falling back to yesterday.`);
+          date.setDate(date.getDate() - 1);
+          try {
+            await this._downloadFile(date);
+            console.log(`[TMDB Export Stream] Yesterday's export file successfully downloaded to ${LOCAL_EXPORT_FILE}`);
+            return; // Success on yesterday's file
+          } catch (fallbackError) {
+            error = fallbackError; // If fallback also fails (e.g. network drops), we let the retry catch it
+          }
+        }
+
+        attempt++;
+        if (attempt > maxRetries) {
+          throw error; // Give up after maxRetries
+        }
+
+        console.warn(`[TMDB Export Stream] Download failed: ${error.message}. Retrying attempt ${attempt}/${maxRetries} in 5 seconds...`);
+        await wait(5000); // Wait 5 seconds before retrying
       }
     }
   }
@@ -47,6 +83,7 @@ class TmdbExportStreamService {
       const dateString = this.getExportDateString(date);
       const url = `${config.tmdb.exportBaseUrl}/movie_ids_${dateString}.json.gz`;
       
+      console.log(`[TMDB Export Stream] Fetching daily export from: ${url}`);
       const protocol = url.startsWith('https') ? https : http;
       
       if (!fs.existsSync(DATA_DIR)) {
@@ -86,8 +123,10 @@ class TmdbExportStreamService {
    */
   async getMovieIds(cursor = 0, limit = 20) {
     if (!fs.existsSync(LOCAL_EXPORT_FILE)) {
-      throw new Error("Local export file not found. Please call /api/tmdb/download-export first.");
+      console.log('[TMDB Export Stream] Local export file not found. Automatically downloading before streaming...');
+      await this.downloadExportFile();
     }
+    console.log(`[TMDB Export Stream] Reading local export file from cursor: ${cursor}, limit: ${limit}`);
     return await this._streamExportLocal(cursor, limit);
   }
 

@@ -19,11 +19,8 @@ class MovieQualityCheckerService {
     }
 
     if (!isStrict) {
-      // In export mode, require poster_path, overview, and either backdrop_path or vote_count >= 5 to filter out obscure B-movies/erotica
+      // In export mode, require poster_path and either backdrop_path or vote_count >= 5 to filter out obscure B-movies/erotica
       if (!movie.poster_path) {
-        return { decision: 'REJECT', score: 0 };
-      }
-      if (!movie.overview || movie.overview.trim().length < 10) {
         return { decision: 'REJECT', score: 0 };
       }
       if (!movie.backdrop_path && (movie.vote_count || 0) < 5) {
